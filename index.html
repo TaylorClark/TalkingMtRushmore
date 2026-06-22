@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Talking Mt Rushmore</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- Full screen rear camera feed -->
+  <video id="camera" autoplay playsinline muted></video>
+
+  <!-- Heads-up info -->
+  <div id="hud">
+    <div id="statusLabel" class="status"></div>
+  </div>
+
+  <!-- Bottom controls -->
+  <div id="controls">
+    <button id="changePresidentBtn" class="change-btn hidden">change president</button>
+    <button id="mainBtn" class="main-btn">Looking for a president…</button>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

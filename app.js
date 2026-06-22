@@ -25,6 +25,10 @@
   var OPENAI_MODEL = 'gpt-4o-mini';
   var API_KEY_STORAGE = 'openai_api_key';
 
+  // Demo mode (?demo in the URL): skip the GPS proximity check and the
+  // compass-based face detection so the chat flow can be tested anywhere.
+  var DEMO = /[?&]demo\b/i.test(window.location.search);
+
   // ---- State --------------------------------------------------------------
 
   var apiKey = null;
@@ -44,6 +48,7 @@
   var mainBtn = document.getElementById('mainBtn');
   var changeBtn = document.getElementById('changePresidentBtn');
   var statusLabel = document.getElementById('statusLabel');
+  var demoPicker = document.getElementById('demoPicker');
 
   // ---- Helpers ------------------------------------------------------------
 
@@ -198,6 +203,39 @@
     }
   }
 
+  // ---- Demo mode: manual president picker --------------------------------
+
+  function setupDemoPicker() {
+    PRESIDENTS.forEach(function (p) {
+      var chip = document.createElement('button');
+      chip.className = 'demo-chip';
+      chip.type = 'button';
+      chip.textContent = p.name;
+      chip.addEventListener('click', function () {
+        selectDemoPresident(p);
+      });
+      demoPicker.appendChild(chip);
+    });
+    demoPicker.classList.remove('hidden');
+
+    // Default to the first face so the main button is usable right away.
+    selectDemoPresident(PRESIDENTS[0]);
+  }
+
+  function selectDemoPresident(p) {
+    closestPresident = p;
+
+    var chips = demoPicker.querySelectorAll('.demo-chip');
+    for (var i = 0; i < chips.length; i++) {
+      chips[i].classList.toggle('selected', chips[i].textContent === p.name);
+    }
+
+    // Only refresh the selection button when we're not in an active chat.
+    if (!currentPresident) {
+      mainBtn.textContent = 'Start chat with ' + p.name;
+    }
+  }
+
   // ---- 4 & 5) Start / change president -----------------------------------
 
   function startChat() {
@@ -216,6 +254,7 @@
 
     mainBtn.textContent = 'Tap and hold to say something to ' + currentPresident;
     changeBtn.classList.remove('hidden');
+    if (DEMO) { demoPicker.classList.add('hidden'); }
     setStatus('Hold the button and speak to ' + currentPresident + '.');
   }
 
@@ -223,6 +262,7 @@
     currentPresident = null;
     conversation = [];
     changeBtn.classList.add('hidden');
+    if (DEMO) { demoPicker.classList.remove('hidden'); }
     setStatus('');
     if (closestPresident) {
       mainBtn.textContent = 'Start chat with ' + closestPresident.name;
@@ -392,11 +432,18 @@
   function init() {
     startCamera();
     initApiKey();
-    checkProximity();
-    startLocationTracking();
-    startCompassTracking();
     recognition = setupRecognition();
     wireEvents();
+
+    if (DEMO) {
+      // Skip the proximity check and live face detection; pick faces by hand.
+      setupDemoPicker();
+      setStatus('Demo mode — pick a president, then tap to start chatting.');
+    } else {
+      checkProximity();
+      startLocationTracking();
+      startCompassTracking();
+    }
   }
 
   if (document.readyState === 'loading') {

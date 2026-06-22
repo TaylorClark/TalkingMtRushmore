@@ -38,6 +38,18 @@ The simplest path is to deploy the three static files (`index.html`,
 `style.css`, `app.js`) to any HTTPS static host (GitHub Pages, Netlify, Vercel,
 etc.) and open it on a phone.
 
+## Demo mode
+
+Add `?demo` to the URL (e.g. `…/TalkingMtRushmore/?demo`) to test the chat
+flow from anywhere — no trip to South Dakota required. Demo mode:
+
+- skips the GPS proximity check (no "you're not near Mt Rushmore" alert), and
+- skips compass-based face detection, showing a row of buttons so you can pick
+  a president by hand.
+
+Everything else (camera, press-and-hold speech, OpenAI chat, spoken replies)
+works exactly as in the live experience.
+
 ## Files
 
 - `index.html` — markup and layout

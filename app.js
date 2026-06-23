@@ -9,12 +9,17 @@
 
   // ---- Config -------------------------------------------------------------
 
-  // GPS coordinates of each presidential face.
+  // GPS coordinates of each presidential face, plus a short personality note
+  // that gives each president a distinct, kid-friendly voice.
   var PRESIDENTS = [
-    { name: 'George Washington',   lat: 43.8786554, lng: -103.4597272 },
-    { name: 'Thomas Jefferson',    lat: 43.8788183, lng: -103.4597007 },
-    { name: 'Theodore Roosevelt',  lat: 43.8790099, lng: -103.4596216 },
-    { name: 'Abraham Lincoln',     lat: 43.8790438, lng: -103.4594687 }
+    { name: 'George Washington',  lat: 43.8786554, lng: -103.4597272,
+      style: 'calm, kind, and fatherly; the very first U.S. president and a Revolutionary War general.' },
+    { name: 'Thomas Jefferson',   lat: 43.8788183, lng: -103.4597007,
+      style: 'curious and clever; an inventor and writer who wrote the Declaration of Independence and loved books, science, and big ideas.' },
+    { name: 'Theodore Roosevelt', lat: 43.8790099, lng: -103.4596216,
+      style: 'energetic, adventurous, and enthusiastic; a cowboy and explorer who loved nature, animals, and the great outdoors. Say "Bully!" when excited.' },
+    { name: 'Abraham Lincoln',    lat: 43.8790438, lng: -103.4594687,
+      style: 'gentle, warm, and wise; a tall storyteller with a good sense of humor who helped keep the country together and end slavery.' }
   ];
 
   // Reference point used for the "are you actually here?" proximity check.
@@ -238,6 +243,24 @@
 
   // ---- 4 & 5) Start / change president -----------------------------------
 
+  // Build a kid-friendly persona prompt for the given president.
+  function buildSystemPrompt(p) {
+    return [
+      'You are ' + p.name + ', one of the four presidents carved into Mount',
+      'Rushmore, talking with a child (roughly 6 to 12 years old) who is',
+      'visiting the monument. You are ' + p.style,
+      '',
+      'How to reply:',
+      '- Stay fully in character as ' + p.name + ', speaking in the first person ("I").',
+      '- Keep replies SHORT: 2 to 4 sentences, like a friendly chat, not a lecture.',
+      '- Use simple, warm, everyday words. If you use a big or old-fashioned word, explain it in a few words.',
+      '- Be encouraging and curious, and often end with a short question to keep the conversation going.',
+      '- Share fun, true, age-appropriate facts about your life and times.',
+      '- Keep everything family-friendly: if a topic is scary, violent, or too grown-up, answer gently and briefly, then steer back to something hopeful or interesting.',
+      '- Your reply is read aloud by a text-to-speech voice, so use plain spoken sentences only: no markdown, bullet points, headings, or emoji.'
+    ].join('\n');
+  }
+
   function startChat() {
     if (!closestPresident) { return; }
     if (!apiKey) {
@@ -249,7 +272,7 @@
 
     // Begin a fresh chat session seeded with the persona prompt.
     conversation = [
-      { role: 'system', content: "answer the user's conversation as if you're " + currentPresident }
+      { role: 'system', content: buildSystemPrompt(closestPresident) }
     ];
 
     mainBtn.textContent = 'Tap and hold to say something to ' + currentPresident;
@@ -351,7 +374,9 @@
       },
       body: JSON.stringify({
         model: OPENAI_MODEL,
-        messages: conversation
+        messages: conversation,
+        temperature: 0.8,   // a little playful warmth without going off the rails
+        max_tokens: 150     // keep replies short for a kid's attention span + TTS
       })
     }).then(function (res) {
       if (!res.ok) {

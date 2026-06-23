@@ -10,16 +10,26 @@
   // ---- Config -------------------------------------------------------------
 
   // GPS coordinates of each presidential face, plus a short personality note
-  // that gives each president a distinct, kid-friendly voice.
+  // that gives each president a distinct, kid-friendly voice, and voice
+  // settings (pitch/rate always apply; preferredVoices are name fragments to
+  // look for among the device's installed speech-synthesis voices).
   var PRESIDENTS = [
     { name: 'George Washington',  lat: 43.8786554, lng: -103.4597272,
-      style: 'calm, kind, and fatherly; the very first U.S. president and a Revolutionary War general.' },
+      style: 'calm, kind, and fatherly; the very first U.S. president and a Revolutionary War general.',
+      pitch: 0.85, rate: 0.9,
+      preferredVoices: ['Daniel', 'Arthur', 'Google UK English Male', 'Alex', 'Fred'] },
     { name: 'Thomas Jefferson',   lat: 43.8788183, lng: -103.4597007,
-      style: 'curious and clever; an inventor and writer who wrote the Declaration of Independence and loved books, science, and big ideas.' },
+      style: 'curious and clever; an inventor and writer who wrote the Declaration of Independence and loved books, science, and big ideas.',
+      pitch: 1.0, rate: 0.98,
+      preferredVoices: ['Alex', 'Aaron', 'Google US English', 'Tom', 'Daniel'] },
     { name: 'Theodore Roosevelt', lat: 43.8790099, lng: -103.4596216,
-      style: 'energetic, adventurous, and enthusiastic; a cowboy and explorer who loved nature, animals, and the great outdoors. Say "Bully!" when excited.' },
+      style: 'energetic, adventurous, and enthusiastic; a cowboy and explorer who loved nature, animals, and the great outdoors. Say "Bully!" when excited.',
+      pitch: 1.15, rate: 1.12,
+      preferredVoices: ['Fred', 'Rishi', 'Junior', 'Google UK English Male', 'Alex'] },
     { name: 'Abraham Lincoln',    lat: 43.8790438, lng: -103.4594687,
-      style: 'gentle, warm, and wise; a tall storyteller with a good sense of humor who helped keep the country together and end slavery.' }
+      style: 'gentle, warm, and wise; a tall storyteller with a good sense of humor who helped keep the country together and end slavery.',
+      pitch: 0.8, rate: 0.85,
+      preferredVoices: ['Arthur', 'Daniel', 'Google UK English Male', 'Alex', 'Fred'] }
   ];
 
   // Reference point used for the "are you actually here?" proximity check.
@@ -409,12 +419,74 @@
     });
   }
 
+  // ---- Per-president speech-synthesis voices -----------------------------
+
+  var voiceFor = {}; // president name -> SpeechSynthesisVoice (or undefined)
+
+  function presidentByName(name) {
+    for (var i = 0; i < PRESIDENTS.length; i++) {
+      if (PRESIDENTS[i].name === name) { return PRESIDENTS[i]; }
+    }
+    return null;
+  }
+
+  // Assign each president a distinct installed English voice. We honor each
+  // president's preferred voice names first, then hand out remaining English
+  // voices so no two presidents share one (when enough voices exist).
+  function assignVoices() {
+    if (!window.speechSynthesis) { return; }
+    var all = window.speechSynthesis.getVoices() || [];
+    var english = all.filter(function (v) {
+      return /^en(-|_|$)/i.test(v.lang || '');
+    });
+    var pool = (english.length ? english : all).slice();
+
+    function take(voice) {
+      var idx = pool.indexOf(voice);
+      if (idx !== -1) { pool.splice(idx, 1); }
+      return voice;
+    }
+
+    voiceFor = {};
+    PRESIDENTS.forEach(function (p) {
+      var picked = null;
+      // 1) First unclaimed voice matching one of the preferred name fragments.
+      for (var i = 0; i < p.preferredVoices.length && !picked; i++) {
+        var frag = p.preferredVoices[i].toLowerCase();
+        for (var j = 0; j < pool.length; j++) {
+          if ((pool[j].name || '').toLowerCase().indexOf(frag) !== -1) {
+            picked = pool[j];
+            break;
+          }
+        }
+      }
+      // 2) Otherwise the next remaining voice, so presidents stay distinct.
+      if (!picked && pool.length) { picked = pool[0]; }
+      if (picked) { take(picked); }
+      voiceFor[p.name] = picked || null;
+    });
+  }
+
+  function setupVoices() {
+    if (!window.speechSynthesis) { return; }
+    assignVoices(); // some browsers have voices ready immediately
+    // Others populate the list asynchronously and fire this event.
+    window.speechSynthesis.onvoiceschanged = assignVoices;
+  }
+
   function speak(text) {
     if (!window.speechSynthesis) { return; }
     window.speechSynthesis.cancel();
+
+    var p = presidentByName(currentPresident);
     var utter = new SpeechSynthesisUtterance(text);
     utter.lang = 'en-US';
-    utter.rate = 0.95;
+    utter.pitch = p ? p.pitch : 1;
+    utter.rate = p ? p.rate : 0.95;
+
+    var voice = p && voiceFor[p.name];
+    if (voice) { utter.voice = voice; }
+
     window.speechSynthesis.speak(utter);
   }
 
@@ -458,6 +530,7 @@
     startCamera();
     initApiKey();
     recognition = setupRecognition();
+    setupVoices();
     wireEvents();
 
     if (DEMO) {

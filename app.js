@@ -11,26 +11,36 @@
 
   // GPS coordinates of each presidential face, plus a short personality note
   // that gives each president a distinct, kid-friendly voice, and voice
-  // settings (pitch/rate always apply; preferredVoices are name fragments to
-  // look for among the device's installed speech-synthesis voices).
+  // settings (pitch/rate always apply; preferredVoices are male voice-name
+  // fragments to look for among the device's installed voices).
   var PRESIDENTS = [
     { name: 'George Washington',  lat: 43.8786554, lng: -103.4597272,
       style: 'calm, kind, and fatherly; the very first U.S. president and a Revolutionary War general.',
-      pitch: 0.85, rate: 0.9,
-      preferredVoices: ['Daniel', 'Arthur', 'Google UK English Male', 'Alex', 'Fred'] },
+      pitch: 0.8, rate: 0.92,
+      preferredVoices: ['Daniel', 'Arthur', 'Microsoft David', 'Google UK English Male', 'Alex', 'Aaron', 'Fred'] },
     { name: 'Thomas Jefferson',   lat: 43.8788183, lng: -103.4597007,
       style: 'curious and clever; an inventor and writer who wrote the Declaration of Independence and loved books, science, and big ideas.',
-      pitch: 1.0, rate: 0.98,
-      preferredVoices: ['Alex', 'Aaron', 'Google US English', 'Tom', 'Daniel'] },
+      pitch: 0.9, rate: 1.0,
+      preferredVoices: ['Alex', 'Aaron', 'Microsoft Guy', 'Tom', 'Daniel', 'Fred'] },
     { name: 'Theodore Roosevelt', lat: 43.8790099, lng: -103.4596216,
       style: 'energetic, adventurous, and enthusiastic; a cowboy and explorer who loved nature, animals, and the great outdoors. Say "Bully!" when excited.',
-      pitch: 1.15, rate: 1.12,
-      preferredVoices: ['Fred', 'Rishi', 'Junior', 'Google UK English Male', 'Alex'] },
+      pitch: 0.95, rate: 1.12,
+      preferredVoices: ['Fred', 'Rishi', 'Junior', 'Microsoft Mark', 'Google UK English Male', 'Aaron'] },
     { name: 'Abraham Lincoln',    lat: 43.8790438, lng: -103.4594687,
       style: 'gentle, warm, and wise; a tall storyteller with a good sense of humor who helped keep the country together and end slavery.',
-      pitch: 0.8, rate: 0.85,
-      preferredVoices: ['Arthur', 'Daniel', 'Google UK English Male', 'Alex', 'Fred'] }
+      pitch: 0.75, rate: 0.88,
+      preferredVoices: ['Arthur', 'Daniel', 'Microsoft David', 'Google UK English Male', 'Oliver', 'Alex'] }
   ];
+
+  // Voice-name fragments used to bias selection toward masculine voices and
+  // away from the (often default) feminine ones, across iOS/Android/Win/Mac.
+  var MALE_VOICE_HINTS = ['male', 'david', 'mark', 'guy', 'daniel', 'alex',
+    'fred', 'aaron', 'arthur', 'rishi', 'tom', 'oliver', 'james', 'john',
+    'reed', 'eddy', 'rocko', 'gordon', 'lee', 'junior', 'ralph', 'bruce'];
+  var FEMALE_VOICE_HINTS = ['female', 'samantha', 'victoria', 'karen', 'moira',
+    'tessa', 'fiona', 'zira', 'susan', 'catherine', 'allison', 'ava', 'serena',
+    'nora', 'linda', 'heather', 'zoe', 'sandy', 'shelley', 'flo', 'kathy',
+    'martha', 'google us english', 'google uk english female'];
 
   // Reference point used for the "are you actually here?" proximity check.
   var RUSHMORE_REF = { lat: 43.8771273, lng: -103.4560535 };
@@ -430,16 +440,35 @@
     return null;
   }
 
-  // Assign each president a distinct installed English voice. We honor each
-  // president's preferred voice names first, then hand out remaining English
-  // voices so no two presidents share one (when enough voices exist).
+  function nameHasHint(voice, hints) {
+    var n = (voice.name || '').toLowerCase();
+    for (var i = 0; i < hints.length; i++) {
+      if (n.indexOf(hints[i]) !== -1) { return true; }
+    }
+    return false;
+  }
+
+  function isLikelyFemale(voice) {
+    return !!voice && nameHasHint(voice, FEMALE_VOICE_HINTS) &&
+           !nameHasHint(voice, MALE_VOICE_HINTS);
+  }
+
+  // Assign each president a distinct masculine voice. We build a pool of
+  // English voices that look male (or at least not female), honor each
+  // president's preferred voice names, then hand out the rest so no two
+  // presidents share a voice (when enough voices exist).
   function assignVoices() {
     if (!window.speechSynthesis) { return; }
     var all = window.speechSynthesis.getVoices() || [];
     var english = all.filter(function (v) {
       return /^en(-|_|$)/i.test(v.lang || '');
     });
-    var pool = (english.length ? english : all).slice();
+    var base = english.length ? english : all;
+
+    var males = base.filter(function (v) { return nameHasHint(v, MALE_VOICE_HINTS); });
+    var notFemale = base.filter(function (v) { return !nameHasHint(v, FEMALE_VOICE_HINTS); });
+    // Prefer explicitly-male voices; fall back to non-female; finally anything.
+    var pool = (males.length ? males : (notFemale.length ? notFemale : base)).slice();
 
     function take(voice) {
       var idx = pool.indexOf(voice);
@@ -481,11 +510,17 @@
     var p = presidentByName(currentPresident);
     var utter = new SpeechSynthesisUtterance(text);
     utter.lang = 'en-US';
-    utter.pitch = p ? p.pitch : 1;
+    utter.pitch = p ? p.pitch : 0.85;
     utter.rate = p ? p.rate : 0.95;
 
     var voice = p && voiceFor[p.name];
     if (voice) { utter.voice = voice; }
+
+    // If the only voice we could get is feminine, drop the pitch further to
+    // make it read more masculine.
+    if (isLikelyFemale(voice)) {
+      utter.pitch = Math.max(0.1, utter.pitch - 0.35);
+    }
 
     window.speechSynthesis.speak(utter);
   }
